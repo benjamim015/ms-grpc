@@ -1,0 +1,6 @@
+coverage
+*.lcov
+node_modules/
+.eslintcache
+.yarn-integrity
+dist

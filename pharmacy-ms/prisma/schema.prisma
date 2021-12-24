@@ -1,0 +1,38 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Pharmacy {
+  id           String @id
+  logo         String
+  name         String
+  cnpj         String
+  address      String
+  openingHours String
+  responsible  String
+  phone        String
+
+  headPharmacy Affiliation?  @relation("affiliatePharmacy")
+  affiliations Affiliation[] @relation("pharmacy")
+
+
+  @@map("pharmacies")
+}
+
+model Affiliation {
+  id                String   @id
+  pharmacyId        String
+  pharmacy          Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade, name: "pharmacy")
+  affiliateId       String   @unique
+  affiliatePharmacy Pharmacy @relation(fields: [affiliateId], references: [id], onDelete: Cascade, name: "affiliatePharmacy")
+
+  @@map("affiliations")
+}

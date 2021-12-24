@@ -1,0 +1,140 @@
+version: '3'
+
+networks:
+  pharmacy-net:
+  product-net:
+  gateway-net:
+  kong-net:
+
+services:
+  pharmacy-db:
+    image: mariadb
+    ports:
+      - "13306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db
+    networks:
+      - pharmacy-net
+
+  pharmacy-db-push:
+    build:
+      context: ./pharmacy-ms
+      dockerfile: Dockerfile.db-push
+    restart: on-failure
+    depends_on:
+      - pharmacy-db
+    networks:
+      - pharmacy-net
+
+  pharmacy-ms:
+    build:
+      context: ./pharmacy-ms
+      dockerfile: Dockerfile
+    env_file:
+      - ./pharmacy-ms/.env
+    ports:
+      - "3001:3000"
+    depends_on:
+      - pharmacy-db-push
+    networks:
+      - pharmacy-net
+      - gateway-net
+
+  product-db:
+    image: mariadb
+    ports:
+      - "23306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: db
+    networks:
+      - product-net
+
+  product-db-push:
+    build:
+      context: ./product-ms
+      dockerfile: Dockerfile.db-push
+    restart: on-failure
+    depends_on:
+      - product-db
+    networks:
+      - product-net
+    
+  product-ms:
+    build:
+      context: ./product-ms
+      dockerfile: Dockerfile
+    env_file:
+      - ./product-ms/.env
+    ports:
+      - "3002:3000"
+    depends_on:
+      - product-db-push
+    networks:
+      - product-net
+      - gateway-net
+
+  kong-database:
+    image: postgres:9.6
+    environment:
+      - POSTGRES_USER=kong
+      - POSTGRES_DB=kong
+      - POSTGRES_PASSWORD=kong
+    networks:
+      - kong-net
+    
+  kong-database-prepare:
+    image: kong:latest
+    environment:
+      - KONG_DATABASE=postgres
+      - KONG_PG_HOST=kong-database
+      - KONG_PG_USER=kong
+      - KONG_PG_PASSWORD=kong
+      - KONG_CASSANDRA_CONTACT_POINTS=kong-database
+    command: kong migrations bootstrap
+    restart: on-failure
+    networks:
+      - kong-net
+    depends_on:
+      - kong-database
+
+  kong:
+    image: kong:latest
+    environment:
+      - KONG_DATABASE=postgres
+      - KONG_PG_HOST=kong-database
+      - KONG_PG_USER=kong
+      - KONG_PG_PASSWORD=kong
+      - KONG_CASSANDRA_CONTACT_POINTS=kong-database
+      - KONG_PROXY_ACCESS_LOG=/dev/stdout
+      - KONG_ADMIN_ACCESS_LOG=/dev/stdout
+      - KONG_PROXY_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl
+    ports:
+      - 8000:8000
+      - 8443:8443
+      - 127.0.0.1:8001:8001
+      - 127.0.0.1:8444:8444
+    networks:
+      - kong-net
+      - gateway-net
+    restart: on-failure
+    depends_on:
+      - kong-database
+      - kong-database-prepare
+
+  kong-deck:
+    image: kong/deck
+    volumes:
+      - ./kong.yaml:/home/kong.yaml
+    command: sync
+    working_dir: /home
+    restart: on-failure
+    environment:
+      - DECK_KONG_ADDR=http://kong:8001
+    networks:
+      - kong-net
+    depends_on:
+      - kong

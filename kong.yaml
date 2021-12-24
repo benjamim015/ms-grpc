@@ -1,0 +1,25 @@
+_format_version: "1.1"
+services:
+- host: pharmacy-ms
+  name: pharmacy-service
+  port: 3000
+  protocol: http
+  routes:
+    - name: pharmacy
+      paths:
+      - /pharmacy-service
+      strip_path: true
+- host: product-ms
+  name: product-service
+  port: 3000
+  protocol: http
+  routes:
+    - name: product
+      paths:
+      - /product-service
+      strip_path: true
+plugins:
+  - name: rate-limiting
+    config:
+      minute: 60
+      policy: local
